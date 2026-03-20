@@ -3,7 +3,12 @@
 #ifndef verifysignature_H
 #define verifysignature_H
 
+#ifdef __KERNEL__
+#include <linux/types.h>
+#include <linux/stddef.h>
+#else
 #include <stddef.h>
+#endif
 
 /*
  * Verifies the signature provided for a message.

@@ -23,6 +23,11 @@ etc.
 The only files that need to be included in your project are verifysignature.h
 and verifysignature.c
 
+To build in Linux/Android kernel space, compile with `__KERNEL__` defined.
+The implementation uses kernel headers (`linux/types.h`, `linux/string.h`,
+`linux/slab.h`) in that mode. For normal userspace builds, it uses standard C
+headers and `malloc/free`.
+
 
 ----------------------
 Implementation details

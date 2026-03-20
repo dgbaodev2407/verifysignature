@@ -35,11 +35,18 @@
  * This is the ISC License: https://en.wikipedia.org/wiki/ISC_license
  */
 
-/* For memset(), memcmp(), strlen() */
+/* For memset(), memcmp(), strlen(), memory allocation */
+#ifdef __KERNEL__
+#include <linux/string.h>
+#include <linux/slab.h>
+#include <linux/types.h>
+#else
 #include <string.h>
-
-/* For int32_t, int64_t, uint64_t */
+#include <stdlib.h>
 #include <stdint.h>
+#endif
+
+/* Kernel gets integer types from linux/types.h */
 
 #define crypto_sign_PUBLICKEYBYTES 32U
 #define crypto_sign_BYTES 64U
@@ -261,6 +268,10 @@ int verify(const unsigned char *sig, const unsigned char *m,
 
     ge_double_scalarmult_vartime(&R, h, &A, sig + 32);
     ge_tobytes(rcheck, &R);
+
+    if (memcmp(rcheck, sig, 32) != 0) {
+        return -1;
+    }
 
     return verify_32(rcheck, sig) | (-(rcheck == sig)) |
            memcmp(sig, rcheck, 32);
@@ -889,11 +900,21 @@ void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
                                   const ge_p3 *A, const unsigned char *b) {
     signed char aslide[256];
     signed char bslide[256];
-    ge_cached Ai[8]; /* A,3A,5A,7A,9A,11A,13A,15A */
+    ge_cached *Ai; /* A,3A,5A,7A,9A,11A,13A,15A */
     ge_p1p1 t;
     ge_p3 u;
     ge_p3 A2;
     int i;
+
+#ifdef __KERNEL__
+    Ai = kmalloc(sizeof(*Ai) * 8, GFP_KERNEL);
+#else
+    Ai = malloc(sizeof(*Ai) * 8);
+#endif
+    if (Ai == 0) {
+        ge_p2_0(r);
+        return;
+    }
 
     slide(aslide,a);
     slide(bslide,b);
@@ -935,6 +956,12 @@ void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
 
         ge_p1p1_to_p2(r,&t);
     }
+
+#ifdef __KERNEL__
+    kfree(Ai);
+#else
+    free(Ai);
+#endif
 }
 
 void ge_tobytes(unsigned char *s, const ge_p2 *h) {

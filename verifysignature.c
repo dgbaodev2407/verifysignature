@@ -35,14 +35,27 @@
  * This is the ISC License: https://en.wikipedia.org/wiki/ISC_license
  */
 
-/* For memset(), memcmp(), strlen() */
+/* For memset(), memcmp(), strlen(), memory allocation */
+#ifdef __KERNEL__
+#include <linux/string.h>
+#include <linux/slab.h>
+#include <linux/types.h>
+#else
 #include <string.h>
-
-/* For int32_t, int64_t, uint64_t */
+#include <stdlib.h>
 #include <stdint.h>
+#endif
+
+/* Kernel gets integer types from linux/types.h */
 
 #define crypto_sign_PUBLICKEYBYTES 32U
 #define crypto_sign_BYTES 64U
+#define GE_CACHED_PRECOMP_SIZE 8U
+#ifdef __KERNEL__
+#ifndef VERIFYSIGNATURE_KMALLOC_FLAGS
+#define VERIFYSIGNATURE_KMALLOC_FLAGS GFP_KERNEL
+#endif
+#endif
 
 typedef struct hash_sha512_state {
     uint64_t      state[8];
@@ -117,8 +130,8 @@ void be64dec_vect(uint64_t *dst, const unsigned char *src, size_t len);
 
 int ge_frombytes_negate_vartime(ge_p3 *h, const unsigned char *s);
 
-void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
-                                  const ge_p3 *A, const unsigned char *b);
+int ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
+                                 const ge_p3 *A, const unsigned char *b);
 
 void ge_tobytes(unsigned char *s, const ge_p2 *h);
 
@@ -180,13 +193,11 @@ int verify_signature(const char *public_key_hex,
                      const char *signature_hex,
                      const unsigned char *contents,
                      const size_t contents_len) {
-    int pk_len = crypto_sign_PUBLICKEYBYTES;
-    int sig_len = crypto_sign_BYTES;
-    unsigned char pk[pk_len];
-    unsigned char sig[sig_len];
+    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+    unsigned char sig[crypto_sign_BYTES];
 
-    hex2bin(pk, pk_len, public_key_hex, strlen(public_key_hex));
-    hex2bin(sig, sig_len, signature_hex, strlen(signature_hex));
+    hex2bin(pk, crypto_sign_PUBLICKEYBYTES, public_key_hex, strlen(public_key_hex));
+    hex2bin(sig, crypto_sign_BYTES, signature_hex, strlen(signature_hex));
 
     return verify(sig, contents, contents_len, pk);
 }
@@ -261,7 +272,9 @@ int verify(const unsigned char *sig, const unsigned char *m,
     hash_sha512_final(&hs, h);
     sc_reduce(h);
 
-    ge_double_scalarmult_vartime(&R, h, &A, sig + 32);
+    if (ge_double_scalarmult_vartime(&R, h, &A, sig + 32) != 0) {
+        return -1;
+    }
     ge_tobytes(rcheck, &R);
 
     return verify_32(rcheck, sig) | (-(rcheck == sig)) |
@@ -887,15 +900,24 @@ static ge_precomp Bi[8] = {
     },
 };
 
-void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
-                                  const ge_p3 *A, const unsigned char *b) {
+int ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
+                                 const ge_p3 *A, const unsigned char *b) {
     signed char aslide[256];
     signed char bslide[256];
-    ge_cached Ai[8]; /* A,3A,5A,7A,9A,11A,13A,15A */
+    ge_cached *Ai; /* A,3A,5A,7A,9A,11A,13A,15A */
     ge_p1p1 t;
     ge_p3 u;
     ge_p3 A2;
     int i;
+
+#ifdef __KERNEL__
+    Ai = kmalloc(sizeof(*Ai) * GE_CACHED_PRECOMP_SIZE, VERIFYSIGNATURE_KMALLOC_FLAGS);
+#else
+    Ai = malloc(sizeof(*Ai) * GE_CACHED_PRECOMP_SIZE);
+#endif
+    if (Ai == NULL) {
+        return -1;
+    }
 
     slide(aslide,a);
     slide(bslide,b);
@@ -937,6 +959,13 @@ void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
 
         ge_p1p1_to_p2(r,&t);
     }
+
+#ifdef __KERNEL__
+    kfree(Ai);
+#else
+    free(Ai);
+#endif
+    return 0;
 }
 
 void ge_tobytes(unsigned char *s, const ge_p2 *h) {

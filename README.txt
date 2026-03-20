@@ -23,6 +23,16 @@ etc.
 The only files that need to be included in your project are verifysignature.h
 and verifysignature.c
 
+To build in Linux/Android kernel space, compile with `__KERNEL__` defined.
+The implementation uses kernel headers (`linux/types.h`, `linux/string.h`,
+`linux/slab.h`) in that mode. For normal userspace builds, it uses standard C
+headers and `malloc/free`.
+Kernel allocations in the scalar-multiplication path default to `GFP_KERNEL`.
+If you must verify from atomic context, define
+`VERIFYSIGNATURE_KMALLOC_FLAGS=GFP_ATOMIC` as a compile definition
+(for example, `-DVERIFYSIGNATURE_KMALLOC_FLAGS=GFP_ATOMIC`) or via a config
+header included before compiling `verifysignature.c`.
+
 
 ----------------------
 Implementation details

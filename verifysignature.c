@@ -124,8 +124,8 @@ void be64dec_vect(uint64_t *dst, const unsigned char *src, size_t len);
 
 int ge_frombytes_negate_vartime(ge_p3 *h, const unsigned char *s);
 
-void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
-                                  const ge_p3 *A, const unsigned char *b);
+int ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
+                                 const ge_p3 *A, const unsigned char *b);
 
 void ge_tobytes(unsigned char *s, const ge_p2 *h);
 
@@ -266,12 +266,10 @@ int verify(const unsigned char *sig, const unsigned char *m,
     hash_sha512_final(&hs, h);
     sc_reduce(h);
 
-    ge_double_scalarmult_vartime(&R, h, &A, sig + 32);
-    ge_tobytes(rcheck, &R);
-
-    if (memcmp(rcheck, sig, 32) != 0) {
+    if (ge_double_scalarmult_vartime(&R, h, &A, sig + 32) != 0) {
         return -1;
     }
+    ge_tobytes(rcheck, &R);
 
     return verify_32(rcheck, sig) | (-(rcheck == sig)) |
            memcmp(sig, rcheck, 32);
@@ -896,8 +894,8 @@ static ge_precomp Bi[8] = {
     },
 };
 
-void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
-                                  const ge_p3 *A, const unsigned char *b) {
+int ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
+                                 const ge_p3 *A, const unsigned char *b) {
     signed char aslide[256];
     signed char bslide[256];
     ge_cached *Ai; /* A,3A,5A,7A,9A,11A,13A,15A */
@@ -911,9 +909,8 @@ void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
 #else
     Ai = malloc(sizeof(*Ai) * 8);
 #endif
-    if (Ai == 0) {
-        ge_p2_0(r);
-        return;
+    if (Ai == NULL) {
+        return -1;
     }
 
     slide(aslide,a);
@@ -962,6 +959,7 @@ void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
 #else
     free(Ai);
 #endif
+    return 0;
 }
 
 void ge_tobytes(unsigned char *s, const ge_p2 *h) {

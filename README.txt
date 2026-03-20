@@ -29,7 +29,9 @@ The implementation uses kernel headers (`linux/types.h`, `linux/string.h`,
 headers and `malloc/free`.
 Kernel allocations in the scalar-multiplication path default to `GFP_KERNEL`.
 If you must verify from atomic context, define
-`VERIFYSIGNATURE_KMALLOC_FLAGS=GFP_ATOMIC` before including/building this file.
+`VERIFYSIGNATURE_KMALLOC_FLAGS=GFP_ATOMIC` as a compile definition
+(for example, `-DVERIFYSIGNATURE_KMALLOC_FLAGS=GFP_ATOMIC`) or via a config
+header included before compiling `verifysignature.c`.
 
 
 ----------------------

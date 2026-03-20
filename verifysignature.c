@@ -51,6 +51,11 @@
 #define crypto_sign_PUBLICKEYBYTES 32U
 #define crypto_sign_BYTES 64U
 #define GE_CACHED_PRECOMP_SIZE 8U
+#ifdef __KERNEL__
+#ifndef VERIFYSIGNATURE_KMALLOC_FLAGS
+#define VERIFYSIGNATURE_KMALLOC_FLAGS GFP_KERNEL
+#endif
+#endif
 
 typedef struct hash_sha512_state {
     uint64_t      state[8];
@@ -906,7 +911,7 @@ int ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a,
     int i;
 
 #ifdef __KERNEL__
-    Ai = kmalloc(sizeof(*Ai) * GE_CACHED_PRECOMP_SIZE, GFP_ATOMIC);
+    Ai = kmalloc(sizeof(*Ai) * GE_CACHED_PRECOMP_SIZE, VERIFYSIGNATURE_KMALLOC_FLAGS);
 #else
     Ai = malloc(sizeof(*Ai) * GE_CACHED_PRECOMP_SIZE);
 #endif

@@ -27,6 +27,7 @@ To build in Linux/Android kernel space, compile with `__KERNEL__` defined.
 The implementation uses kernel headers (`linux/types.h`, `linux/string.h`,
 `linux/slab.h`) in that mode. For normal userspace builds, it uses standard C
 headers and `malloc/free`.
+Kernel allocations in the scalar-multiplication path use `GFP_ATOMIC`.
 
 
 ----------------------
